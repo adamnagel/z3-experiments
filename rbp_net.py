@@ -37,15 +37,20 @@ def ssh_route(src, dst):
     s.add(SSH_SERVER[objective[1]])
 
 
+def sftp_route(src, dst):
+    ssh_route(src, dst)
+    s.add(SFTP_SERVER[dst])
+
+
 for objective in objectives:
     src = objective[0]
     dst = objective[1]
+    protocol = objective[2]
 
-    if objective[2] == 'sftp':
-        ssh_route(src, dst)
-        s.add(SFTP_SERVER[dst])
+    if protocol == 'sftp':
+        sftp_route(src, dst)
 
-    if objective[2] == 'ssh':
+    if protocol == 'ssh':
         ssh_route(src, dst)
 
 print('')
