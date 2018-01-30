@@ -1,5 +1,4 @@
 #!/usr/bin/python
-import networkx as nx
 from z3 import *
 
 
@@ -8,6 +7,17 @@ class Wifi_Security(object):
     WEP = 1
     WPA = 2
     WPA2 = 3
+
+    @staticmethod
+    def vmap(val):
+        if val == 0:
+            return 'None'
+        if val == 1:
+            return 'WEP'
+        if val == 2:
+            return 'WPA'
+        if val == 3:
+            return 'WPA2'
 
     def __init__(self,
                  name,
@@ -37,6 +47,13 @@ class Wifi_Security(object):
 class Wifi_Frequency(object):
     GHZ_2_4 = 2
     GHZ_5 = 5
+
+    @staticmethod
+    def vmap(val):
+        if val == 2:
+            return '2.4 GHz'
+        if val == 5:
+            return '5 GHz'
 
     def __init__(self,
                  name,
@@ -84,23 +101,29 @@ class Wifi(object):
         return var_sec, var_freq, And(constr_freq, constr_sec)
 
 
-WIFI_FREQ_24 = 2
-WIFI_FREQ_5 = 5
-
 s = Solver()
 
 # Create RBP
 rbp_wifi_sec, rbp_wifi_freq, constr = Wifi(name='rbp',
-                                           security_excludes=[Wifi_Security.WPA2],
-                                           frequency_excludes=[Wifi_Frequency.GHZ_5]).z3()
+                                           security_includes=[Wifi_Security.NONE,
+                                                              Wifi_Security.WEP,
+                                                              Wifi_Security.WPA],
+                                           frequency_includes=[Wifi_Frequency.GHZ_2_4]
+                                           ).z3()
 s.add(constr)
 
 # Create WRT
-wrt_wifi_sec, wrt_wifi_freq, constr2 = Wifi(name='wrt').z3()
+wrt_wifi_sec, wrt_wifi_freq, constr2 = Wifi(name='wrt',
+                                            security_includes=[Wifi_Security.NONE,
+                                                               Wifi_Security.WEP,
+                                                               Wifi_Security.WPA,
+                                                               Wifi_Security.WPA2],
+                                            frequency_includes=[Wifi_Frequency.GHZ_2_4,
+                                                                Wifi_Frequency.GHZ_5]
+                                            ).z3()
 s.add(constr2)
 
-
-# Constrain WiFi technology choices
+# Compose WiFi technology choices
 s.add(rbp_wifi_sec == wrt_wifi_sec)
 s.add(rbp_wifi_freq == wrt_wifi_freq)
 
@@ -110,10 +133,21 @@ print('Is there a satisfying solution?')
 print(s.check())
 
 print('What is it?')
+i = 1
 while s.check() == sat:
-    print(s.model())
+    print ('== Configuration {} =='.format(i))
+    print ('RBP Wifi Security:  {}'.format(Wifi_Security.vmap(s.model()[rbp_wifi_sec])))
+    print ('WRT Wifi Security:  {}'.format(Wifi_Security.vmap(s.model()[wrt_wifi_sec])))
+    print ('RBP Wifi Frequency: {}'.format(Wifi_Frequency.vmap(s.model()[rbp_wifi_freq])))
+    print ('WRT Wifi Frequency: {}'.format(Wifi_Frequency.vmap(s.model()[wrt_wifi_freq])))
+    print ('')
+
+    # print(s.model())
     s.add(Or(rbp_wifi_sec != s.model()[rbp_wifi_sec],
-             wrt_wifi_sec != s.model()[wrt_wifi_sec]))
+             wrt_wifi_sec != s.model()[wrt_wifi_sec],
+             rbp_wifi_freq != s.model()[rbp_wifi_freq],
+             wrt_wifi_freq != s.model()[wrt_wifi_freq]))
+    i += 1
 
 import unittest
 
